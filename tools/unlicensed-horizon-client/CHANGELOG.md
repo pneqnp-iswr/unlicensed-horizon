@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 (2026-10-30)
+
+- Added conservative machine-readable `lab-probe` diagnosis and concrete next action for missing files, Rust panics, graphics-backend problems, timeouts and malformed/missing smoke reports.
+- A nonempty smoke report is no longer treated as valid JSON automatically; JSON syntax is checked separately, and zero-exit smoke results remain inconclusive.
+- Restricted the child process to an allowlist of essential OS/graphics environment variables to reduce accidental credentials leakage.
+- Added diagnosis matrix tests, secret-environment regression tests, and bounded log-tail test.
+- No claim of successful Rust-loader boot or fully independent gameplay.
+
+
 ## 0.6.0 (2026-10-30)
 
 - Added an isolated, time-bounded `lab-probe` that executes a user-provided real Horizon client with a copy of experimental resources and no account/profile data, with process log, JSON report and optional Horizon smoke report. The launcher itself enforces a timeout and does not open a normal game world.

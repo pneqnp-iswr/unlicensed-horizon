@@ -113,7 +113,7 @@ $bLab = New-Button '4. Create Original Content Lab (experimental, not playable)'
 $bContract = New-Button '5. Inspect Original Lab Contracts (not a game boot)' 28 768 624 ([System.Drawing.Color]::FromArgb(61, 74, 91))
 $bContract.Add_Click({
     try {
-        $root = Join-Path $env:APPDATA 'unlicensed-horizon-client\open-content-lab-v0.6'
+        $root = Join-Path $env:APPDATA 'unlicensed-horizon-client\open-content-lab-v0.7'
         $result = & $exe lab-contract $root 2>&1
         $jsonLine = ($result | Where-Object { $_ -is [string] -and $_.Trim().StartsWith('{') } | Select-Object -First 1)
         if (-not $jsonLine) { throw [string]($result -join [Environment]::NewLine) }

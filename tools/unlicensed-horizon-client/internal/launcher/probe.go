@@ -37,6 +37,9 @@ type ProbeResult struct {
 	TimedOut          bool   `json:"timed_out"`
 	ElapsedMillis     int64  `json:"elapsed_millis"`
 	SmokeReportFound  bool   `json:"smoke_report_found"`
+	SmokeReportJSON   bool   `json:"smoke_report_json_valid"`
+	DiagnosticCode    string `json:"diagnostic_code"`
+	SuggestedAction   string `json:"suggested_action"`
 	LogPath           string `json:"log_path"`
 	SmokeReportPath   string `json:"smoke_report_path"`
 	Failure           string `json:"failure,omitempty"`
@@ -44,22 +47,24 @@ type ProbeResult struct {
 }
 
 func safeProbeEnv(home string) []string {
-	// Avoid inheriting a personal login session or any path selecting a user's
-	// real game installation. The only resource root comes from --resources.
-	reject := map[string]bool{
-		"HORIZON_HOME": true, "HORIZON_SESSION_FILE": true,
-		"HORIZON_PLAYER_NAME": true, "HORIZON_MINECRAFT_DIR": true,
-		"HORIZON_LAUNCHER_HOME": true, "XDG_DATA_HOME": true,
-		"XDG_CONFIG_HOME": true, "XDG_RUNTIME_DIR": true,
-		"HORIZON_SERVER_THREAD": true,
-		"APPDATA":               true, "LOCALAPPDATA": true,
-		"USERPROFILE": true, "HOME": true,
-		"TEMP": true, "TMP": true,
+	// A child process must never inherit account tokens or arbitrary launcher
+	// variables. Allow only OS and graphics settings needed for executable startup.
+	// This is process-environment hygiene, not a full OS-level sandbox.
+	allowed := map[string]bool{
+		"PATH": true, "PATHEXT": true, "SYSTEMROOT": true, "WINDIR": true,
+		"COMSPEC": true, "OS": true, "NUMBER_OF_PROCESSORS": true,
+		"PROCESSOR_ARCHITECTURE": true, "PROGRAMFILES": true,
+		"PROGRAMFILES(X86)": true, "PROGRAMW6432": true,
+		"LANG": true, "LANGUAGE": true, "LC_ALL": true, "LC_CTYPE": true,
+		"TZ": true, "DISPLAY": true, "WAYLAND_DISPLAY": true,
+		"XDG_SESSION_TYPE": true, "LD_LIBRARY_PATH": true,
+		"LIBGL_DRIVERS_PATH": true, "VK_ICD_FILENAMES": true,
+		"VK_LAYER_PATH": true,
 	}
-	filtered := make([]string, 0, len(os.Environ())+5)
+	filtered := make([]string, 0, len(os.Environ())+12)
 	for _, entry := range os.Environ() {
-		key, _, _ := strings.Cut(entry, "=")
-		if !reject[strings.ToUpper(key)] {
+		key, _, ok := strings.Cut(entry, "=")
+		if ok && allowed[strings.ToUpper(key)] {
 			filtered = append(filtered, entry)
 		}
 	}
@@ -89,7 +94,7 @@ func saveProbeResult(path string, result ProbeResult) error {
 // to a new scratch tree. It NEVER writes to either the source lab or the normal
 // game profile, even if the client crashes or times out.
 func ProbeOpenLab(o ProbeOptions) (ProbeResult, error) {
-	r := ProbeResult{Version: "0.6", Engine: o.Engine, LabSource: o.Lab,
+	r := ProbeResult{Version: "0.7", Engine: o.Engine, LabSource: o.Lab,
 		Conclusion: "Diagnostic probe only. Process exit and smoke-file presence are NOT proof of a playable Horizon game."}
 	if o.Timeout < 1*time.Second || o.Timeout > 120*time.Second {
 		return r, errors.New("timeout must be between 1 and 120 seconds")
@@ -132,7 +137,7 @@ func ProbeOpenLab(o ProbeOptions) (ProbeResult, error) {
 	if err := os.MkdirAll(absReports, 0700); err != nil {
 		return r, err
 	}
-	scratch, err := os.MkdirTemp(absReports, "probe-v0.6-")
+	scratch, err := os.MkdirTemp(absReports, "probe-v0.7-")
 	if err != nil {
 		return r, err
 	}
@@ -198,9 +203,14 @@ func ProbeOpenLab(o ProbeOptions) (ProbeResult, error) {
 	if e != nil {
 		r.Failure = e.Error()
 	}
-	if info, statErr := os.Stat(r.SmokeReportPath); statErr == nil && info.Mode().IsRegular() && info.Size() > 0 {
+	var smokeBytes []byte
+	if info, statErr := os.Lstat(r.SmokeReportPath); statErr == nil && info.Mode().IsRegular() && info.Size() > 0 {
 		r.SmokeReportFound = true
+		if info.Size() <= 8<<20 {
+			smokeBytes, _ = os.ReadFile(r.SmokeReportPath)
+		}
 	}
+	diagnoseProbe(&r, readProbeLogTail(r.LogPath), smokeBytes)
 	// This result file is machine-readable and survives even a crashing client.
 	if resultErr := saveProbeResult(filepath.Join(scratch, "probe-result.json"), r); resultErr != nil {
 		return r, fmt.Errorf("write probe report: %w", resultErr)
