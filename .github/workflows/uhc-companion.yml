@@ -1,0 +1,49 @@
+name: UHC companion — Go verification and Windows build
+
+on:
+  push:
+    paths:
+      - 'tools/unlicensed-horizon-client/**'
+      - '.github/workflows/uhc-companion.yml'
+      - 'FORK_DIFFERENCES.md'
+  pull_request:
+    paths:
+      - 'tools/unlicensed-horizon-client/**'
+      - '.github/workflows/uhc-companion.yml'
+      - 'FORK_DIFFERENCES.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Test and cross-build offline-profile addon
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/unlicensed-horizon-client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/unlicensed-horizon-client/go.mod
+          cache: false
+      - name: Unit tests
+        run: go test -count=1 ./...
+      - name: Static analysis
+        run: go vet ./...
+      - name: Build Windows x64 CLI
+        run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o unlicensed-horizon-client.exe ./cmd/uhc
+      - name: Package Windows launcher files
+        uses: actions/upload-artifact@v4
+        with:
+          name: unlicensed-horizon-client-windows-x64
+          path: |
+            tools/unlicensed-horizon-client/unlicensed-horizon-client.exe
+            tools/unlicensed-horizon-client/Launcher.ps1
+            tools/unlicensed-horizon-client/START-WINDOWS.bat
+            tools/unlicensed-horizon-client/OPEN-LAB-WINDOWS.bat
+            tools/unlicensed-horizon-client/PROBE-LAB-WINDOWS.bat
+            tools/unlicensed-horizon-client/README.md
+          if-no-files-found: error
