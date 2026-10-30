@@ -1,3 +1,10 @@
+> [!IMPORTANT]
+> **Unlicensed Horizon — experimental community fork (companion tools v0.6.0).** This is a fork of [horizon-rust/horizon](https://github.com/horizon-rust/horizon), **not** an official Horizon, Mojang or Microsoft release. At this stage the upstream Rust engine remains unchanged; our additions are an optional [offline-profile launcher and original-content compatibility laboratory](tools/unlicensed-horizon-client/). These tools use a local nickname and provide isolated diagnostic probes, but **do not provide a playable copy of Minecraft without the proprietary game data**. No Mojang assets are bundled.
+>
+> **[What we changed vs. upstream](FORK_DIFFERENCES.md)** · **[Our launcher source and build instructions](tools/unlicensed-horizon-client/README.md)** · **[Original Horizon](https://github.com/horizon-rust/horizon)**
+
+---
+
 <p align="center">
   <img src="docs/media/banner.webp" alt="Horizon: Minecraft: Java Edition 26.3, rewritten in Rust and checked against vanilla by more than 300 differential harnesses" width="100%">
 </p>

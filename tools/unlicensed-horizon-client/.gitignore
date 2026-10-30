@@ -1,0 +1,8 @@
+# Build artifacts and machine-local data
+/unlicensed-horizon-client.exe
+/*.exe
+/open-content-lab*/
+/probe-reports/
+*.log
+*.tmp
+.DS_Store
