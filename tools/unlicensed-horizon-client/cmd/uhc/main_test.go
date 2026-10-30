@@ -43,7 +43,7 @@ func TestJSONProfileEmptyArguments(t *testing.T) {
 func TestCLIOriginalResourceLab(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("UHC_DATA_DIR", dir)
-	lab := filepath.Join(dir, "open-content-lab-v0.6")
+	lab := filepath.Join(dir, "open-content-lab-v0.7")
 	if err := run([]string{"lab-init"}); err != nil {
 		t.Fatal(err)
 	}

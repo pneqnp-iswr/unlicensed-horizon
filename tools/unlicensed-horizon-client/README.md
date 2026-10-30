@@ -1,10 +1,10 @@
-# unlicensed-horizon-client v0.6.0
+# unlicensed-horizon-client v0.7.0
 
 Independent local-profile launcher for the MIT-licensed [Horizon](https://github.com/horizon-rust/horizon) game engine. Windows x64 release; CLI code is in Go (standard library); GUI uses PowerShell 5.1+ Windows Forms. Not affiliated with Horizon, Mojang or Microsoft.
 
 **Important:** This application does not verify a Microsoft/Minecraft account and can start Horizon with an offline nickname (`--name`). It is **NOT a ready-to-play unlicensed copy of Minecraft**. Horizon requires a complete bundle of prepared Minecraft 26.3 data from a legally obtained copy. It cannot be reproduced merely by supplying a texture pack. This ZIP contains no Minecraft client/server jars, proprietary data, sounds, textures, session tokens or bypass for online-mode accounts. To reach a genuinely standalone playable open-content game, the assets and generated gameplay data would require an independent implementation plus testing against Horizon's loaders.
 
-> **Repository integration:** This folder is a self-contained Go/PowerShell addon inside the [unlicensed-horizon fork](https://github.com/pneqnp-iswr/unlicensed-horizon). It is **not** a modification to the original Rust game. Pre-generated `examples/` and Windows binaries from the downloadable v0.6 ZIP are deliberately not committed here; run `lab-init` to regenerate research fixtures and build the EXE locally. See the root [`FORK_DIFFERENCES.md`](../../FORK_DIFFERENCES.md) for an evidence-based comparison.
+> **Repository integration:** This folder is a self-contained Go/PowerShell addon inside the [unlicensed-horizon fork](https://github.com/pneqnp-iswr/unlicensed-horizon). It is **not** a modification to the original Rust game. Pre-generated `examples/` and Windows binaries from the earlier downloadable ZIP are deliberately not committed here; run `lab-init` to regenerate research fixtures and build the EXE locally. See the root [`FORK_DIFFERENCES.md`](../../FORK_DIFFERENCES.md) for an evidence-based comparison.
 
 ## Quick start
 
@@ -16,7 +16,7 @@ Independent local-profile launcher for the MIT-licensed [Horizon](https://github
 
 For the full legal preparation procedure using your own Minecraft copy, see Horizon's [README](https://github.com/horizon-rust/horizon/blob/main/README.md). As of 2026-10-30 it uses Minecraft Java Edition 26.3 and JDK 25 for data preparation.
 
-## v0.6: Original environment tables + real-client diagnostic probe
+## v0.7: Classified diagnostics (building on the v0.6 laboratory)
 
 The **new v3 laboratory** contains 82 independent files plus its provenance manifest (19 block states, 18 model bindings, 36 procedural PNG files). Two new original JSON files implement the **shape** of `data/minecraft/timeline/day.json` and `data/minecraft/dimension_type/overworld.json`, as directly read by Horizon's `Environment::load_dimension`. They have new semantic checks for period/track/keyframe and dimension attributes. They are NOT derived from Mojang's dimension or timeline files.
 
@@ -24,12 +24,12 @@ The **new v3 laboratory** contains 82 independent files plus its provenance mani
 
 ```cmd
 unlicensed-horizon-client.exe lab-init
-unlicensed-horizon-client.exe lab-contract "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.6"
-unlicensed-horizon-client.exe lab-audit "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.6"
+unlicensed-horizon-client.exe lab-contract "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.7"
+unlicensed-horizon-client.exe lab-audit "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.7"
 unlicensed-horizon-client.exe lab-probe --timeout 20 --frames 2
 ```
 
-The GUI has a separate **6. Run isolated Horizon laboratory probe** button; `PROBE-LAB-WINDOWS.bat` performs the same explicit action. The probe requires an installed/selected `horizon-client.exe` and a freshly generated v0.6 lab. Reports live under `%APPDATA%\unlicensed-horizon-client\probe-reports\` and no existing worlds are read, changed or removed. A GPU/display driver may still be needed for the real client, even with `--offscreen`.
+The GUI has a separate **6. Run isolated Horizon laboratory probe** button; `PROBE-LAB-WINDOWS.bat` performs the same explicit action. The probe requires an installed/selected `horizon-client.exe` and a freshly generated v0.7 lab. Reports live under `%APPDATA%\unlicensed-horizon-client\probe-reports\` and no existing worlds are read, changed or removed. A GPU/display driver may still be needed for the real client, even with `--offscreen`.
 
 These are original-content *research fixtures*, not a version of Minecraft without a license.
 
@@ -43,8 +43,8 @@ The structural checker is written in Go and covers only the **documented subset*
 
 ```cmd
 unlicensed-horizon-client.exe lab-init
-unlicensed-horizon-client.exe lab-contract "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.6"
-unlicensed-horizon-client.exe lab-audit "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.6"
+unlicensed-horizon-client.exe lab-contract "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.7"
+unlicensed-horizon-client.exe lab-audit "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.7"
 ```
 
 ## v0.4 (previous): Original-content resource laboratory and corrected upstream preflight
@@ -59,10 +59,10 @@ Create and validate the lab on Windows in Command Prompt:
 
 ```bat
 unlicensed-horizon-client.exe lab-init
-unlicensed-horizon-client.exe lab-audit "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.6"
+unlicensed-horizon-client.exe lab-audit "%APPDATA%\unlicensed-horizon-client\open-content-lab-v0.7"
 ```
 
-You can also use **Create Original Content Lab** in the GUI, or inspect the example lab bundled in `examples/original-resource-lab-v0.6/`.
+You can also use **Create Original Content Lab** in the GUI, or generate a new lab using `lab-init` (no generated files are committed to Git).
 
 ## v0.3 (previous): Fixes and features
 
@@ -90,6 +90,20 @@ You can also use **Create Original Content Lab** in the GUI, or inspect the exam
 For quickjoin, clear World (`--world ''`) and set `--server 127.0.0.1:25565`, or enter the server in GUI (World empty).
 
 Data files: `%APPDATA%\unlicensed-horizon-client\config.json`. Saves and options: `%APPDATA%\unlicensed-horizon-client\game-home\`. Engine release: `%APPDATA%\unlicensed-horizon-client\engines\<tag>\`.
+
+## Probe triage (v0.7)
+
+`lab-probe` now reports `diagnostic_code`, `suggested_action`, and
+`smoke_report_json_valid` alongside process status. Typical codes are
+`missing_file`, `rust_panic`, `graphics_backend`, `timeout`,
+`invalid_smoke_json`, `missing_smoke_report`, and `inconclusive`.
+
+This classification only examines a bounded tail of the process log and the
+smoke file's basic JSON syntax. It is deliberately conservative: **even a
+zero-exit process with a syntactically valid JSON smoke report is classified
+as inconclusive, not playable**. The probe now passes through only a
+restricted allowlist of basic OS/graphics environment variables and supplies
+isolated home/config directories; it is not an OS-level security sandbox.
 
 ## Build and verification
 

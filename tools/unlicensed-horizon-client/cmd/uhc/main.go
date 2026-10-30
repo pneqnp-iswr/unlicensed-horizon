@@ -16,7 +16,7 @@ import (
 )
 
 func usage() {
-	fmt.Print(`unlicensed-horizon-client 0.6  (independent local Horizon launcher)
+	fmt.Print(`unlicensed-horizon-client 0.7  (independent local Horizon launcher)
 
 Commands:
   doctor                     Inspect configuration and required files
@@ -128,7 +128,7 @@ func run(args []string) error {
 		if len(args) > 2 {
 			return fmt.Errorf("usage: lab-init [directory]")
 		}
-		dest := filepath.Join(dataDir, "open-content-lab-v0.6")
+		dest := filepath.Join(dataDir, "open-content-lab-v0.7")
 		if len(args) == 2 {
 			dest = args[1]
 		}

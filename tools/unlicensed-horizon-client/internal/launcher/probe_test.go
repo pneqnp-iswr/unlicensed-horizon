@@ -12,6 +12,9 @@ import (
 
 func TestSafeProbeEnvRedactsAuthenticationAndHome(t *testing.T) {
 	t.Setenv("HORIZON_SESSION_FILE", "secret-token.json")
+	t.Setenv("HORIZON_NEW_AUTH_TOKEN", "danger-horizon-secret")
+	t.Setenv("GITHUB_TOKEN", "danger-github-secret")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "danger-cloud-secret")
 	t.Setenv("HORIZON_HOME", "/real/home")
 	t.Setenv("APPDATA", "/real/appdata")
 	tmp := t.TempDir()
@@ -20,12 +23,14 @@ func TestSafeProbeEnvRedactsAuthenticationAndHome(t *testing.T) {
 	for _, entry := range env {
 		key, val, _ := strings.Cut(entry, "=")
 		found[strings.ToUpper(key)] = val
-		if strings.Contains(entry, "secret-token") || strings.Contains(entry, "/real/home") || strings.Contains(entry, "/real/appdata") {
+		if strings.Contains(entry, "secret-token") || strings.Contains(entry, "danger-") || strings.Contains(entry, "/real/home") || strings.Contains(entry, "/real/appdata") {
 			t.Errorf("unsafe environment leaked: %q", entry)
 		}
 	}
-	if _, ok := found["HORIZON_SESSION_FILE"]; ok {
-		t.Fatal("session variable inherited")
+	for _, key := range []string{"HORIZON_SESSION_FILE", "HORIZON_NEW_AUTH_TOKEN", "GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY"} {
+		if _, ok := found[key]; ok {
+			t.Fatalf("sensitive variable %s inherited", key)
+		}
 	}
 	for _, key := range []string{"HORIZON_HOME", "APPDATA", "LOCALAPPDATA", "USERPROFILE", "HOME", "TEMP", "TMP"} {
 		if found[key] != tmp {
@@ -66,7 +71,7 @@ func TestProbeLabIsolationAndReports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !r.ProcessStarted || !r.ProcessExitedZero || !r.SmokeReportFound || r.TimedOut {
+	if !r.ProcessStarted || !r.ProcessExitedZero || !r.SmokeReportFound || !r.SmokeReportJSON || r.TimedOut {
 		t.Fatalf("unexpected result: %+v", r)
 	}
 	if r.CopiedFiles != 83 {
@@ -94,6 +99,9 @@ func TestProbeLabIsolationAndReports(t *testing.T) {
 	}
 	if decoded.ProbeDir != r.ProbeDir {
 		t.Fatal("invalid saved probe report")
+	}
+	if decoded.DiagnosticCode != "inconclusive" {
+		t.Fatalf("unexpected diagnostic: %s", decoded.DiagnosticCode)
 	}
 	if !strings.Contains(decoded.Conclusion, "NOT proof") {
 		t.Fatal("report overstated conclusions")
@@ -153,5 +161,47 @@ func TestV3EnvironmentContractRejectsCorruptTimeline(t *testing.T) {
 	}
 	if _, issues := AuditOpenLab(root); len(issues) == 0 {
 		t.Fatal("integrity audit missed corrupted timeline")
+	}
+}
+
+func TestProbeDiagnosticClassification(t *testing.T) {
+	cases := []struct {
+		name string
+		r ProbeResult
+		log string
+		smoke string
+		wantCode string
+		valid bool
+	}{
+		{"inconclusive", ProbeResult{ProcessStarted:true, ProcessExitedZero:true, SmokeReportFound:true}, "", `{"frames":2}`, "inconclusive", true},
+		{"missing_file", ProbeResult{ProcessStarted:true}, "No such file or directory: assets/foo", "", "missing_file", false},
+		{"panic", ProbeResult{ProcessStarted:true}, "thread 'render' panicked at asset.rs", "", "rust_panic", false},
+		{"gpu", ProbeResult{ProcessStarted:true}, "wgpu adapter not found", "", "graphics_backend", false},
+		{"invalid_smoke", ProbeResult{ProcessStarted:true,ProcessExitedZero:true,SmokeReportFound:true}, "", "{oops", "invalid_smoke_json", false},
+		{"empty_smoke_object", ProbeResult{ProcessStarted:true,ProcessExitedZero:true,SmokeReportFound:true}, "", "{}", "invalid_smoke_json", false},
+		{"no_smoke", ProbeResult{ProcessStarted:true,ProcessExitedZero:true}, "", "", "missing_smoke_report", false},
+		{"nonzero_exit", ProbeResult{ProcessStarted:true}, "unknown error", "", "nonzero_exit", false},
+		{"timeout", ProbeResult{ProcessStarted:true,TimedOut:true}, "no such file", "", "timeout", false},
+		{"start_failed", ProbeResult{}, "", "", "start_failed", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name,func(t *testing.T) {
+			diagnoseProbe(&tc.r, []byte(tc.log), []byte(tc.smoke))
+			if tc.r.DiagnosticCode != tc.wantCode || tc.r.SmokeReportJSON != tc.valid || tc.r.SuggestedAction == "" {
+				t.Fatalf("diagnostic=%+v, want %s valid=%t", tc.r,tc.wantCode,tc.valid)
+			}
+		})
+	}
+}
+
+func TestProbeLogTailLimit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "large.log")
+	prefix := strings.Repeat("p", int(maxProbeLogTail)+2048)
+	if err := os.WriteFile(path, []byte(prefix+"END"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	b := readProbeLogTail(path)
+	if len(b) > int(maxProbeLogTail) || !strings.HasSuffix(string(b), "END") {
+		t.Fatalf("bad log tail length %d", len(b))
 	}
 }
