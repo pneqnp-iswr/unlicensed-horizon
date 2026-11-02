@@ -6,6 +6,10 @@ Independent local-profile launcher for the MIT-licensed [Horizon](https://github
 
 > **Repository integration:** This folder is a self-contained Go/PowerShell addon inside the [unlicensed-horizon fork](https://github.com/pneqnp-iswr/unlicensed-horizon). It is **not** a modification to the original Rust game. Pre-generated `examples/` and Windows binaries from the earlier downloadable ZIP are deliberately not committed here; run `lab-init` to regenerate research fixtures and build the EXE locally. See the root [`FORK_DIFFERENCES.md`](../../FORK_DIFFERENCES.md) for an evidence-based comparison.
 
+## Offline server test (`azetech_`)
+
+Use [AZETECH-TEST.md](AZETECH-TEST.md) and the [PowerShell test script](TEST-AZETECH.ps1) to configure the local nickname `azetech_`, query the Minecraft server-list status endpoint with `probe-server HOST[:PORT]`, preflight assets, and attempt an actual Horizon multiplayer join on a trusted private offline-mode server. Status responses do **not** authenticate players or prove they spawned. PowerShell 5.1 users can clear the world field using `--world=`.
+
 ## Quick start
 
 1. Unzip on Windows 10/11 x64. Double-click `START-WINDOWS.bat`.
