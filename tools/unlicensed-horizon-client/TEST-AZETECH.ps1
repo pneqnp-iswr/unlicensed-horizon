@@ -28,7 +28,7 @@ if (Test-Path -LiteralPath $configPath -PathType Leaf) {
 }
 
 Write-Host "Configuring local Horizon nickname '$Nickname' and target '$Server'..."
-& $cli config --name $Nickname --world '' --server $Server
+& $cli config --name $Nickname --world= --server $Server
 if ($LASTEXITCODE -ne 0) { Write-Error 'Configuration rejected by launcher.'; exit 1 }
 
 Write-Host 'Checking Minecraft status endpoint (does NOT authenticate a player)...'
