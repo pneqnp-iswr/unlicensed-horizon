@@ -225,6 +225,13 @@ function Prepare-Game {
         $env:HORIZON_QUICKPLAY_ENGINE = $engine
         $env:HORIZON_QUICKPLAY_PREPARED = $script:preparedTarget
         $env:HORIZON_QUICKPLAY_MC_DIR = $script:minecraftPath.Text.Trim()
+        # A UTF-8 report is more reliable than a PowerShell 5.1 stderr redirect,
+        # whose active codepage can turn Russian diagnostics into mojibake.
+        $diagnosticFile = Join-Path $script:logDir 'prepare-diagnostic.json'
+        if (Test-Path -LiteralPath $diagnosticFile -PathType Leaf) {
+            Remove-Item -LiteralPath $diagnosticFile -Force
+        }
+        $env:HORIZON_QUICKPLAY_PREPARE_DIAG = $diagnosticFile
         $helper = Join-Path $PSScriptRoot 'AutoPrepare.ps1'
         if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) {
             throw 'Не найден встроенный AutoPrepare.ps1.'
@@ -543,15 +550,32 @@ $script:timer.Add_Tick({
             $script:busy = $false
             if ($code -ne 0) {
                 $script:playButton.Enabled = $true
-                $details = ''
-                $errFile = Join-Path $script:logDir 'prepare-stderr.log'
-                if (Test-Path -LiteralPath $errFile) {
-                    $details = ((Get-Content -LiteralPath $errFile -Tail 9) -join [Environment]::NewLine)
+                $diagnosticFile = Join-Path $script:logDir 'prepare-diagnostic.json'
+                $diagnosticShown = $false
+                if (Test-Path -LiteralPath $diagnosticFile -PathType Leaf) {
+                    try {
+                        # Explicitly decode the preparer's UTF-8 JSON, not console stderr.
+                        $report = Get-Content -LiteralPath $diagnosticFile -Raw -Encoding UTF8 | ConvertFrom-Json
+                        if ($report.status -eq 'error' -and $report.code -and $report.message) {
+                            $items = @($report.missing_paths | Where-Object { $_ })
+                            $list = ''
+                            if ($items.Count -gt 0) {
+                                $list = [Environment]::NewLine + [Environment]::NewLine +
+                                    'Отсутствуют:' + [Environment]::NewLine +
+                                    (($items | Select-Object -First 5 | ForEach-Object { '- ' + $_ }) -join [Environment]::NewLine)
+                            }
+                            Fail ('Ошибка подготовки [' + $report.code + ']:' + [Environment]::NewLine +
+                                $report.message + $list + [Environment]::NewLine +
+                                [Environment]::NewLine + 'Подробности: ' + $diagnosticFile)
+                            $diagnosticShown = $true
+                        }
+                    } catch { }
                 }
-                Fail ('Не удалось автоматически подготовить игру.' + [Environment]::NewLine +
-                    $details + [Environment]::NewLine +
-                    'Нужна установленная Minecraft Java Edition 26.3 из твоей копии игры. ' +
-                    'Для лицензированных ресурсов используй официальный Minecraft Launcher.')
+                if (-not $diagnosticShown) {
+                    Fail ('Подготовка игровых ресурсов завершилась с кодом ' + $code + '.' +
+                        [Environment]::NewLine + 'Логи: ' + $script:logDir +
+                        [Environment]::NewLine + 'Установленный Horizon сам по себе не содержит игровые данные Minecraft 26.3.')
+                }
             } else {
                 $script:resourcesPath = $script:preparedTarget
                 $script:resourcesLabel.Text = 'Игровые ресурсы: подготовлены автоматически'

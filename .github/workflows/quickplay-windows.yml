@@ -90,3 +90,8 @@ jobs:
         run: |
           & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "tools/horizon-quickplay/tests/profile_persistence.ps1" -Cli "$env:RUNNER_TEMP\unlicensed-horizon-client.exe" -Source "tools/horizon-quickplay/assets/QuickPlay.ps1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify readable Minecraft preparation diagnostics on Windows PowerShell 5.1
+        shell: pwsh
+        run: |
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "tools/horizon-quickplay/tests/prepare_diagnostics.ps1" -Source "tools/horizon-quickplay/assets/AutoPrepare.ps1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
