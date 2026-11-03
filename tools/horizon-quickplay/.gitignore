@@ -1,0 +1,7 @@
+# The embedded helper is generated from the sibling companion Go module.
+assets/unlicensed-horizon-client.exe
+
+# Windows GUI binaries and local build output.
+Horizon-QuickPlay*.exe
+dist/
+__pycache__/
