@@ -320,7 +320,7 @@ function Play-Clicked {
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Horizon QuickPlay'
-$form.ClientSize = New-Object System.Drawing.Size(602, 707)
+$form.ClientSize = New-Object System.Drawing.Size(602, 777)
 $form.MinimumSize = $form.Size
 $form.MaximumSize = $form.Size
 $form.BackColor = UI-Color 19 27 39
@@ -404,18 +404,32 @@ $checkServer.Add_Click({
         } else { Fail ('Не удалось получить статус сервера:' + [Environment]::NewLine + $result.Text) }
     } catch { Fail $_.Exception.Message }
 })
-$script:playButton = Button '▶   PLAY HORIZON' 32 507 537 55 @(38, 135, 110)
+$manual = Button 'Локальный Horizon… (если GitHub недоступен)' 32 496 537 38 @(68, 85, 108)
+$manual.Add_Click({
+    try {
+        $dialog = New-Object System.Windows.Forms.OpenFileDialog
+        $dialog.Title = 'Выбери horizon-client.exe из распакованного архива Horizon'
+        $dialog.Filter = 'Horizon client (horizon-client.exe)|horizon-client.exe'
+        $dialog.CheckFileExists = $true
+        if ($dialog.ShowDialog() -eq 'OK') {
+            Save-Profile
+            Use-Local-Horizon $dialog.FileName
+            Alert 'Движок выбран. Нажми PLAY HORIZON.'
+        }
+    } catch { Fail $_.Exception.Message }
+})
+$script:playButton = Button '▶   PLAY HORIZON' 32 555 537 55 @(38, 135, 110)
 $script:playButton.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 14)
 $script:playButton.Add_Click({ Play-Clicked })
-$script:status = Label 'PLAY скачает Horizon и проверит игровые файлы.' 32 572 537 42
+$script:status = Label 'PLAY скачает Horizon и проверит игровые файлы.' 32 620 537 42
 $script:status.ForeColor = UI-Color 163 222 199
 $script:progress = New-Object System.Windows.Forms.ProgressBar
-$script:progress.Location = New-Object System.Drawing.Point(32, 625)
+$script:progress.Location = New-Object System.Drawing.Point(32, 687)
 $script:progress.Size = New-Object System.Drawing.Size(424, 18)
 $script:progress.Style = 'Marquee'
 $script:progress.MarqueeAnimationSpeed = 0
 $form.Controls.Add($script:progress)
-$cancel = Button 'Отмена' 469 616 100 37 @(108, 69, 72)
+$cancel = Button 'Отмена' 469 678 100 37 @(108, 69, 72)
 $cancel.Enabled = $false
 $cancel.Add_Click({
     foreach ($task in @('installProcess', 'prepareProcess')) {
@@ -435,7 +449,7 @@ $cancel.Add_Click({
     $script:progress.MarqueeAnimationSpeed = 0
     Set-Status 'Установка отменена. Частично скачанные файлы можно будет проверить при следующем запуске.'
 })
-$footer = Label 'Локальные ники работают только на offline-mode серверах. Для online-mode нужна авторизация.' 32 660 542 40
+$footer = Label 'Локальные ники работают только на offline-mode серверах. Для online-mode нужна авторизация.' 32 730 542 40
 $footer.ForeColor = UI-Color 140 159 180
 
 $script:timer = New-Object System.Windows.Forms.Timer
