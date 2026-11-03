@@ -62,8 +62,8 @@ jobs:
           b = p.read_bytes()
           assert b[:2] == b'MZ', 'missing DOS header'
           pe = int.from_bytes(b[0x3c:0x40], 'little')
-          assert b[pe:pe+4] == b'PE\\x00\\x00', 'missing PE header'
-          assert b[pe+4:pe+6] == b'\\x64\\x86', 'not an AMD64 executable'
+          assert b[pe:pe+4] == bytes([80, 69, 0, 0]), 'missing PE header'
+          assert b[pe+4:pe+6] == bytes([0x64, 0x86]), 'not an AMD64 executable'
           print(f'Validated Windows x64 PE: {p.stat().st_size} bytes')
           PY
           cd tools/horizon-quickplay/dist
