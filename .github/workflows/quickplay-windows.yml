@@ -1,0 +1,72 @@
+name: Horizon QuickPlay Windows x64
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/horizon-quickplay/**'
+      - 'tools/unlicensed-horizon-client/**'
+      - '.github/workflows/quickplay-windows.yml'
+  pull_request:
+    paths:
+      - 'tools/horizon-quickplay/**'
+      - 'tools/unlicensed-horizon-client/**'
+      - '.github/workflows/quickplay-windows.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-gui-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: false
+      - name: Test and vet offline-profile companion
+        working-directory: tools/unlicensed-horizon-client
+        run: |
+          go test -count=1 ./...
+          go vet ./...
+      - name: Cross-compile embedded Windows CLI
+        working-directory: tools/unlicensed-horizon-client
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: go build -trimpath -ldflags="-s -w" -o ../horizon-quickplay/assets/unlicensed-horizon-client.exe ./cmd/uhc
+      - name: Check QuickPlay PowerShell regression contracts
+        working-directory: tools/horizon-quickplay
+        run: python3 verify_static.py
+      - name: Vet and build self-contained QuickPlay Windows GUI
+        working-directory: tools/horizon-quickplay
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          go vet ./...
+          mkdir -p dist
+          go build -trimpath -ldflags="-s -w -H windowsgui" -o dist/Horizon-QuickPlay.exe .
+      - name: Confirm Windows executable signature
+        working-directory: tools/horizon-quickplay
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('dist/Horizon-QuickPlay.exe')
+          payload=p.read_bytes()
+          assert payload[:2]==b'MZ'
+          pe=int.from_bytes(payload[0x3c:0x40], 'little')
+          assert payload[pe:pe+4]==b'PE\\0\\0'.replace(b'\\0',b'\x00')
+          print('Windows PE executable verified:', p.stat().st_size, 'bytes')
+          PY
+      - name: Upload standalone Windows launcher
+        uses: actions/upload-artifact@v4
+        with:
+          name: Horizon-QuickPlay-Windows-x64
+          path: tools/horizon-quickplay/dist/Horizon-QuickPlay.exe
+          if-no-files-found: error
+          retention-days: 30
