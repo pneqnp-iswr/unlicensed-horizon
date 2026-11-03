@@ -1,6 +1,6 @@
-# Horizon QuickPlay v1.6 — single EXE for Windows
+# Horizon QuickPlay v1.7 — single EXE for Windows
 
-**Double-click `Horizon-QuickPlay-v1.6.exe`.** Type any valid nickname (default `azetech_`), choose Singleplayer or a trusted offline-mode server, and press **PLAY**. The launcher remembers your nickname and downloads the **open-source Horizon engine** from its verified release channel, then checks for prepared game data. If missing, it detects an existing Minecraft Java Edition 26.3 installation in `%APPDATA%\.minecraft` (or a custom folder selected in the GUI), downloads the version-pinned Minecraft server jar from Mojang after validating its SHA-1 and size, and runs the release `horizon-prepare` tool automatically. It also validates prepared data before starting. The GUI remains responsive and displays progress; logs are saved under `%APPDATA%\unlicensed-horizon-client\quickplay-logs`. A separate Microsoft login is not required to set an offline nickname.
+**Double-click `Horizon-QuickPlay-v1.7.exe`.** Type any valid nickname (default `azetech_`), choose Singleplayer or a trusted offline-mode server, and press **PLAY**. The launcher remembers your nickname and downloads the **open-source Horizon engine** from its verified release channel, then checks for prepared game data. If missing, it detects an existing Minecraft Java Edition 26.3 installation in `%APPDATA%\.minecraft` (or a custom folder selected in the GUI), downloads the version-pinned Minecraft server jar from Mojang after validating its SHA-1 and size, and runs the release `horizon-prepare` tool automatically. It also validates prepared data before starting. The GUI remains responsive and displays progress; logs are saved under `%APPDATA%\unlicensed-horizon-client\quickplay-logs`. A separate Microsoft login is not required to set an offline nickname.
 
 **Not a license bypass:** the playable Rust engine needs prepared Minecraft Java Edition 26.3 resources from a copy you are permitted to use. The EXE does not contain or download protected client jars/assets or bypass ownership verification, and it cannot sign in to Minecraft online-mode servers without valid Minecraft credentials. The locally installed Java Edition 26.3 files are a prerequisite for automatic preparation; if they are absent, install and run the game once using its official launcher with an authorized account. Java 25 may also be required for resource preparation. This is not a ready-to-play license-free Minecraft distribution. The experimental original-content lab in the underlying fork is not a playable game.
 
@@ -27,6 +27,14 @@ To cross-compile from Linux, set `GOOS=windows GOARCH=amd64 CGO_ENABLED=0` befor
 ## Implementation boundaries
 
 The UI is a WinForms PowerShell 5.1 script embedded inside a Go Windows GUI executable. Engine installation/verification, profile persistence, resource checking and game spawning are delegated to the separately tested companion launcher. The GUI's direct local game boot is not testable in the Linux build environment. Real Windows/GPU gameplay and a successful multiplayer spawn must be tested on a host with the required assets and server.
+
+## v1.7: fix "engine selected" followed by "install Horizon first"
+
+The previous GUI selected an existing `horizon-client.exe` and confirmed it, but the next automatic `Save-Profile` could replace the selected `client_path` with a missing or stale value from the CLI's `show` output. This produced a misleading "install Horizon first" error *even though the game binary exists*, as reproduced by a Windows user using the official Horizon install folder.
+
+QuickPlay now maintains the selected engine path in its own session state, persists that exact path in each profile save, and reads the result back before claiming success. A successful engine download also updates the same state. On Windows, a new PowerShell 5.1 regression runs actual profile persistence functions against the compiled companion CLI and verifies that a locally selected `horizon-client.exe` survives repeated saves, including paths containing spaces.
+
+This only fixes engine selection and persistence. The next step may still require generating prepared Minecraft 26.3 resources. An engine executable on disk does not imply the user has the proprietary game data or that an authenticated server accepts the offline nickname.
 
 ## v1.6: detailed installer errors and manually selected game engine
 
