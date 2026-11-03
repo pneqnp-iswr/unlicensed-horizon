@@ -68,8 +68,16 @@ function Get-Profile {
         $lines = & $cli show 2>&1
         if ($LASTEXITCODE -ne 0) { return $map }
         foreach ($line in @($lines)) {
-            $part = ([string]$line).Split(@('='), 2)
-            if ($part.Count -eq 2) { $map[$part[0]] = $part[1] }
+            $record = [string]$line
+            # PowerShell 5.1 can select a different .NET String.Split overload
+            # for .Split(@('='), 2). Read key=value using a precise separator.
+            $separator = $record.IndexOf('=')
+            if ($separator -gt 0) {
+                $key = $record.Substring(0, $separator).Trim()
+                if ($key.Length -gt 0) {
+                    $map[$key] = $record.Substring($separator + 1)
+                }
+            }
         }
     } catch { }
     return $map
