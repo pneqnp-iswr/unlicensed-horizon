@@ -22,4 +22,9 @@ assert '$gameHomeDir = [string]$previous[\'home\']' in qp
 assert 'home_path = $gameHomeDir' in qp
 assert not re.search(r'\$home\s*=', qp, re.I), 'legacy HOME assignment'
 assert 'File]::Replace(' not in qp, 'v1.3 preferences fix regressed'
-print('STATIC VALIDATION PASSED: PowerShell 5.1 BOM; no read-only variable assignment; v1.3 hotfix preserved; v1.4 home_path fixed')
+assert "Find-Local-Horizon" in qp, "no local engine autodetection"
+assert "Use-Local-Horizon" in qp, "manual engine fallback absent"
+assert "Get-Content -LiteralPath $filePath -Tail 12" in qp, "download stderr/stdout diagnostic absent"
+assert "Проверь интернет. " not in qp, "misleading generic install error still present"
+assert "Локальный Horizon" in qp, "manual engine picker button absent"
+print('STATIC VALIDATION PASSED: PowerShell 5.1 BOM; protected variables; preferences; HOME; local engine fallback; accurate install logs')
