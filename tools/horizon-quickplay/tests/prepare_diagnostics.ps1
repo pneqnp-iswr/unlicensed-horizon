@@ -19,8 +19,15 @@ try {
     $env:HORIZON_QUICKPLAY_PREPARE_DIAG = $diagnostic
 
     $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    & $windowsPowerShell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Source 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { throw 'Preparation incorrectly accepted missing files' }
+    $outFile = Join-Path $testDir 'prepare-stdout.txt'
+    $errFile = Join-Path $testDir 'prepare-stderr.txt'
+    # A nonzero native child's stderr is an ErrorRecord with Stop preference
+    # on Windows PowerShell 5.1. Run as a process and assert its exit code.
+    $child = Start-Process -FilePath $windowsPowerShell -ArgumentList @(
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-File', ('"' + $Source + '"')
+    ) -Wait -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    if ($child.ExitCode -eq 0) { throw 'Preparation incorrectly accepted missing files' }
     if (-not (Test-Path -LiteralPath $diagnostic -PathType Leaf)) {
         throw 'No structured diagnostic written'
     }
