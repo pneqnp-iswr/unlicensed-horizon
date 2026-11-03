@@ -1,6 +1,6 @@
-# Horizon QuickPlay v1.4 — single EXE for Windows
+# Horizon QuickPlay v1.5 — single EXE for Windows
 
-**Double-click `Horizon-QuickPlay-v1.4.exe`.** Type any valid nickname (default `azetech_`), choose Singleplayer or a trusted offline-mode server, and press **PLAY**. The launcher remembers your nickname and downloads the **open-source Horizon engine** from its verified release channel, then checks for prepared game data. If missing, it detects an existing Minecraft Java Edition 26.3 installation in `%APPDATA%\.minecraft` (or a custom folder selected in the GUI), downloads the version-pinned Minecraft server jar from Mojang after validating its SHA-1 and size, and runs the release `horizon-prepare` tool automatically. It also validates prepared data before starting. The GUI remains responsive and displays progress; logs are saved under `%APPDATA%\unlicensed-horizon-client\quickplay-logs`. A separate Microsoft login is not required to set an offline nickname.
+**Double-click `Horizon-QuickPlay-v1.5.exe`.** Type any valid nickname (default `azetech_`), choose Singleplayer or a trusted offline-mode server, and press **PLAY**. The launcher remembers your nickname and downloads the **open-source Horizon engine** from its verified release channel, then checks for prepared game data. If missing, it detects an existing Minecraft Java Edition 26.3 installation in `%APPDATA%\.minecraft` (or a custom folder selected in the GUI), downloads the version-pinned Minecraft server jar from Mojang after validating its SHA-1 and size, and runs the release `horizon-prepare` tool automatically. It also validates prepared data before starting. The GUI remains responsive and displays progress; logs are saved under `%APPDATA%\unlicensed-horizon-client\quickplay-logs`. A separate Microsoft login is not required to set an offline nickname.
 
 **Not a license bypass:** the playable Rust engine needs prepared Minecraft Java Edition 26.3 resources from a copy you are permitted to use. The EXE does not contain or download protected client jars/assets or bypass ownership verification, and it cannot sign in to Minecraft online-mode servers without valid Minecraft credentials. The locally installed Java Edition 26.3 files are a prerequisite for automatic preparation; if they are absent, install and run the game once using its official launcher with an authorized account. Java 25 may also be required for resource preparation. This is not a ready-to-play license-free Minecraft distribution. The experimental original-content lab in the underlying fork is not a playable game.
 
@@ -28,6 +28,12 @@ To cross-compile from Linux, set `GOOS=windows GOARCH=amd64 CGO_ENABLED=0` befor
 
 The UI is a WinForms PowerShell 5.1 script embedded inside a Go Windows GUI executable. Engine installation/verification, profile persistence, resource checking and game spawning are delegated to the separately tested companion launcher. The GUI's direct local game boot is not testable in the Linux build environment. Real Windows/GPU gameplay and a successful multiplayer spawn must be tested on a host with the required assets and server.
 
+## v1.5: fix HTTP 403 from api.github.com
+
+The Horizon engine installer now reads the official rolling `nightly` release assets directly from `github.com/horizon-rust/horizon/releases/download/nightly/`, **without calling the unauthenticated GitHub REST API**. This avoids a common `HTTP 403 from api.github.com` caused by shared-IP API limits. The archive is still accepted only after validating the pinned upstream Ed25519 signature on `SHA256SUMS` and the matching SHA-256 digest. The launcher does not disable security verification, download from arbitrary mirrors, or request the player's GitHub credentials.
+
+If the download from **github.com** itself fails, check access to GitHub release assets or use a network that can reach them. A blocked site, TLS interception, missing release asset or unavailable network cannot be fixed merely by removing the API request. The client resources are still required from an authorized Minecraft installation, and no online-mode server authentication is bypassed.
+
 ## One-click install sequence
 
 1. Double-click the EXE, enter `azetech_` or another nickname and click Play.
@@ -54,7 +60,7 @@ For a real test, open the executable and enter `azetech_`; the first Play downlo
 - Persist settings with validated absolute paths, UTF-8 temp-file generation and a previous-version backup, and recover from a damaged JSON file when a valid `.bak` is available. No third-argument `.Replace()` remains in QuickPlay.
 - The EXE embeds the patched PowerShell UI and its underlying Go CLI; it still requires prepared, legitimately obtained Minecraft data for gameplay. Windows Forms and actual Minecraft multiplayer cannot be exercised on the Linux build host, so the fix is compiled/static-checked, not yet GUI-tested.
 
-## v1.4 hotfix: PowerShell HOME is read-only
+## v1.5 hotfix: PowerShell HOME is read-only
 
 - Fix reproduced from the Windows GUI: 
 `Cannot overwrite variable HOME because it is read-only or constant` (Russian: 

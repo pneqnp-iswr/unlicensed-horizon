@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,7 +25,9 @@ const (
 	// Horizon's published release key, pinned from crates/horizon-release-sign/release-keys.txt.
 	// Updating this key requires a reviewed source change, not a network download.
 	horizonReleaseKey = "MU4oiIQcCxkZvbwSjjXs7SySCuM6ywRQ3nGaJYZG0gw="
-	apiURL            = "https://api.github.com/repos/horizon-rust/horizon/releases?per_page=30"
+	// Nightly is the official rolling game channel. Fixed asset URLs avoid
+	// unauthenticated api.github.com release-list rate limits (HTTP 403/429).
+	nightlyDownloadBase = "https://github.com/horizon-rust/horizon/releases/download/nightly/"
 	maxArchive        = int64(180 << 20)
 	maxExtract        = int64(950 << 20)
 )
@@ -152,27 +153,28 @@ func checksumFor(sums []byte, filename string) (string, error) {
 	}
 	return "", fmt.Errorf("checksum not listed for %s", filename)
 }
+// signedNightlyAssets names only public release assets from the verified
+// upstream game repository. It does not download or trust any data itself.
+// The caller MUST check SHA256SUMS.sig with the pinned signing key, then
+// verify the archive's SHA-256 before installation.
+func signedNightlyAssets() (GHRelease, GHAsset, GHAsset, GHAsset) {
+	asset := GHAsset{Name: "horizon-windows-x64.zip", URL: nightlyDownloadBase + "horizon-windows-x64.zip"}
+	sums := GHAsset{Name: "SHA256SUMS", URL: nightlyDownloadBase + "SHA256SUMS"}
+	sig := GHAsset{Name: "SHA256SUMS.sig", URL: nightlyDownloadBase + "SHA256SUMS.sig"}
+	return GHRelease{Tag: "nightly", Assets: []GHAsset{asset, sums, sig}, Prerelease: true}, asset, sums, sig
+}
+
 func InstallLatest(ctx context.Context, dataDir string, c *Config, progress func(string)) error {
 	if runtime.GOOS != "windows" {
 		return errors.New("automatic engine install currently supports Windows x64 only")
 	}
-	progress("Checking GitHub releases...")
-	body, err := get(ctx, apiURL, 4<<20)
-	if err != nil {
-		return err
-	}
-	var releases []GHRelease
-	if err := json.Unmarshal(body, &releases); err != nil {
-		return err
-	}
-	rel, asset, sumsAsset, err := chooseRelease(releases, "horizon-windows-x64.zip")
-	if err != nil {
-		return err
-	}
-	sigAsset, exists := findAsset(rel, "SHA256SUMS.sig")
-	if !exists {
-		return errors.New("release has no SHA256SUMS.sig; refusing unsigned download")
-	}
+	// Horizon releases now use the moving `nightly` tag. Download its
+	// public assets directly instead of querying the unauthenticated GitHub
+	// REST API (which frequently returns HTTP 403 at the shared IP limit).
+	// The download is trusted ONLY after its pinned Ed25519 signature and
+	// the matching archive SHA-256 are verified below.
+	rel, asset, sumsAsset, sigAsset := signedNightlyAssets()
+	progress("Downloading official signed Horizon Nightly (no GitHub API required)...")
 	for _, a := range []GHAsset{asset, sumsAsset, sigAsset} {
 		parsed, e := url.Parse(a.URL)
 		if e != nil || parsed.Scheme != "https" || parsed.Hostname() != "github.com" || !strings.HasPrefix(parsed.Path, "/horizon-rust/horizon/releases/download/") {
