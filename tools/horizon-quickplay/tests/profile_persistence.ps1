@@ -51,6 +51,10 @@ try {
     [IO.File]::WriteAllBytes($enginePath, [byte[]](0x4d, 0x5a))
 
     Save-Profile # Initial profile, no engine yet
+    $initialProfile = Get-Profile
+    if ([string]$initialProfile['name'] -ne 'azetech_') {
+        throw "Get-Profile did not parse the CLI show output. Name='$($initialProfile['name'])'"
+    }
     Use-Local-Horizon $enginePath
     for ($step = 1; $step -le 3; $step++) {
         Save-Profile # Same sequence used before Play/Prepare/doctor
