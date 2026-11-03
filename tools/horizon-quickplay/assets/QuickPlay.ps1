@@ -506,8 +506,19 @@ $script:timer.Add_Tick({
                 [Environment]::NewLine + 'Распакуй официальный ZIP и выбери horizon-client.exe через «Локальный Horizon…».')
             Fail $message
         } else {
-            Set-Status 'Движок Horizon установлен.'
-            if ($script:pendingPlay) { $script:pendingPlay = $false; Launch-Game }
+            $installedProfile = Get-Profile
+            $installedEngine = [string]$installedProfile['client']
+            if (-not $installedEngine -or -not (Test-Path -LiteralPath $installedEngine -PathType Leaf)) {
+                $script:pendingPlay = $false
+                $script:playButton.Enabled = $true
+                Fail 'Установщик завершился без ошибки, но horizon-client.exe не найден в сохранённом профиле. Открой логи установки.'
+            } else {
+                # Installer updated the on-disk path; update the in-memory selection
+                # as well, or the next Save-Profile could undo a successful install.
+                $script:selectedEnginePath = $installedEngine
+                Set-Status ('Движок Horizon установлен: ' + $installedEngine)
+                if ($script:pendingPlay) { $script:pendingPlay = $false; Launch-Game }
+            }
         }
         } else {
             $installLog = Join-Path $script:logDir 'install-stdout.log'
