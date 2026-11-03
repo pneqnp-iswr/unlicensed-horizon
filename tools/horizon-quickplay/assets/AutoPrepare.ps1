@@ -16,6 +16,25 @@ function Ensure-Path([string]$path) {
     [void][System.IO.Directory]::CreateDirectory($path)
 }
 
+# Write UTF-8 structured diagnostics instead of requiring the GUI to decode
+# Russian PowerShell 5.1 stderr through a separate process/codepage.
+$script:prepareDiagnostic = [Environment]::GetEnvironmentVariable('HORIZON_QUICKPLAY_PREPARE_DIAG')
+function Stop-Preparation([string]$code, [string]$message, [string[]]$missingPaths = @()) {
+    if (-not [string]::IsNullOrWhiteSpace($script:prepareDiagnostic)) {
+        $report = [ordered]@{
+            status = 'error'
+            code = $code
+            message = $message
+            missing_paths = @($missingPaths)
+        }
+        $json = $report | ConvertTo-Json -Depth 4
+        $target = [System.IO.Path]::GetFullPath($script:prepareDiagnostic)
+        [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($target))
+        [System.IO.File]::WriteAllText($target, $json, (New-Object System.Text.UTF8Encoding($false)))
+    }
+    throw "[$code] $message"
+}
+
 $engine = [Environment]::GetEnvironmentVariable('HORIZON_QUICKPLAY_ENGINE')
 $output = [Environment]::GetEnvironmentVariable('HORIZON_QUICKPLAY_PREPARED')
 if ([string]::IsNullOrWhiteSpace($engine) -or -not (ExistingFile $engine)) {
@@ -36,13 +55,22 @@ $clientJar = Join-Path $versionRoot '26.3.jar'
 $assetsIndex = Join-Path $mc 'assets\indexes'
 $assetsObjects = Join-Path $mc 'assets\objects'
 $libraries = Join-Path $mc 'libraries'
-if (-not (ExistingFile $versionJson) -or -not (ExistingFile $clientJar) -or
-    -not [System.IO.Directory]::Exists($assetsIndex) -or
-    -not [System.IO.Directory]::Exists($assetsObjects) -or
-    -not [System.IO.Directory]::Exists($libraries)) {
-    throw ('Minecraft Java Edition 26.3 не установлена в ' + $mc + '. ' +
-        'Установи и запусти её один раз через официальный Minecraft Launcher (с лицензией), ' +
-        'после чего QuickPlay сможет автоматически подготовить ресурсы.')
+# Report the exact absent paths, rather than a generic install failure.
+$requiredFiles = @($versionJson, $clientJar)
+$requiredDirs = @($assetsIndex, $assetsObjects, $libraries)
+$missing = @()
+foreach ($candidate in $requiredFiles) {
+    if (-not (ExistingFile $candidate)) { $missing += $candidate }
+}
+foreach ($candidate in $requiredDirs) {
+    if (-not [System.IO.Directory]::Exists($candidate)) { $missing += $candidate }
+}
+if ($missing.Count -gt 0) {
+    Stop-Preparation 'MINECRAFT_26_3_INPUTS_MISSING' (
+        'В выбранной папке нет полного набора игровых файлов Minecraft Java Edition 26.3. ' +
+        'Если Minecraft установлена в другой папке, нажми «Обзор…» и выбери её каталог с versions, assets и libraries. ' +
+        'Если локальной установленной копии игры нет, Horizon не сможет подготовить её ресурсы.'
+    ) $missing
 }
 
 Report 'Найдена локальная Minecraft Java Edition 26.3. Проверяю исходные файлы...'
@@ -60,7 +88,7 @@ if ($clientSha1 -cnotmatch '^[a-fA-F0-9]{40}$' -or $clientSize -le 0) {
 }
 if ((Get-Item -LiteralPath $clientJar).Length -ne $clientSize -or
     (Get-FileHash -LiteralPath $clientJar -Algorithm SHA1).Hash -ine $clientSha1) {
-    throw 'Установленный client.jar не прошёл проверку SHA-1. Восстанови Minecraft 26.3 через официальный лаунчер.'
+    Stop-Preparation 'MINECRAFT_CLIENT_CHECKSUM_MISMATCH' 'Установленный client.jar не прошёл проверку SHA-1. Восстанови Minecraft 26.3 через официальный лаунчер.' @($clientJar)
 }
 Report 'Проверка client.jar по SHA-1 пройдена.'
 
