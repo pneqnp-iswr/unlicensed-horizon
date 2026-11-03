@@ -411,10 +411,19 @@ $script:timer.Add_Tick({
         if ($code -ne 0) {
             $script:pendingPlay = $false
             $script:playButton.Enabled = $true
-            $details = ''
-            $errFile = Join-Path $script:logDir 'install-stderr.log'
-            if (Test-Path $errFile) { $details = (Get-Content $errFile -Tail 12) -join [Environment]::NewLine }
-            Fail ('Не удалось установить движок Horizon. Проверь интернет. ' + $details)
+            $details = @()
+            foreach ($fileName in @('install-stderr.log', 'install-stdout.log')) {
+                $filePath = Join-Path $script:logDir $fileName
+                if (Test-Path -LiteralPath $filePath -PathType Leaf) {
+                    $details += @(Get-Content -LiteralPath $filePath -Tail 12 -ErrorAction SilentlyContinue)
+                }
+            }
+            $message = ('Не удалось установить Horizon. Код: ' + $code +
+                [Environment]::NewLine + (($details | Select-Object -Last 20) -join [Environment]::NewLine) +
+                [Environment]::NewLine + 'Логи: ' + $script:logDir +
+                [Environment]::NewLine + 'Загрузка вручную: https://github.com/horizon-rust/horizon/releases/tag/nightly' +
+                [Environment]::NewLine + 'Распакуй официальный ZIP и выбери horizon-client.exe через «Локальный Horizon…».')
+            Fail $message
         } else {
             Set-Status 'Движок Horizon установлен.'
             if ($script:pendingPlay) { $script:pendingPlay = $false; Launch-Game }
