@@ -26,6 +26,7 @@ Commands:
   install                    Install official open-source Horizon game binary
   find-resources             Locate existing prepared 26.3 game data
   audit-resources            Inspect actual loader inputs (static preflight)
+  probe-server HOST[:PORT]    Test Java server status endpoint (NOT player login)
   lab-init [DIR]             Generate an ORIGINAL incomplete resource experiment
   lab-audit DIR              Verify hashes, provenance and cross-file contracts
   lab-contract DIR           Inspect registry, tags, model refs and PNGs as JSON
@@ -189,6 +190,18 @@ func run(args []string) error {
 		}
 		fmt.Println("File checksums and subset contracts passed. Rust-loader boot and gameplay are UNVERIFIED.")
 		return nil
+	case "probe-server":
+		if len(args) != 2 {
+			return fmt.Errorf("usage: probe-server HOST[:PORT]")
+		}
+		if err := launcher.ValidateServer(args[1]); err != nil {
+			return err
+		}
+		report, probeErr := ProbeMinecraftStatus(args[1], 5*time.Second)
+		if err := json.NewEncoder(os.Stdout).Encode(report); err != nil {
+			return err
+		}
+		return probeErr
 	case "logs":
 		if len(args) != 1 {
 			return fmt.Errorf("logs takes no options")
