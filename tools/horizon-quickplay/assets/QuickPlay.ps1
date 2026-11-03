@@ -255,6 +255,40 @@ function Launch-Game {
         Fail $_.Exception.Message
     }
 }
+function Find-Local-Horizon {
+    $roots = @()
+    if ($env:APPDATA) {
+        $roots += (Join-Path $env:APPDATA 'horizon-launcher\versions')
+        $roots += (Join-Path $env:APPDATA 'unlicensed-horizon-client\engines')
+    }
+    if ($env:LOCALAPPDATA) {
+        $roots += (Join-Path $env:LOCALAPPDATA 'Horizon\current')
+        $roots += (Join-Path $env:LOCALAPPDATA 'Horizon\releases')
+    }
+    foreach ($root in $roots) {
+        if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
+        $direct = Join-Path $root 'horizon-client.exe'
+        if (Test-Path -LiteralPath $direct -PathType Leaf) { return $direct }
+        $children = @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 30)
+        foreach ($child in $children) {
+            foreach ($candidate in @((Join-Path $child.FullName 'horizon-client.exe'),
+                    (Join-Path $child.FullName 'horizon\horizon-client.exe'))) {
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+            }
+        }
+    }
+    return $null
+}
+function Use-Local-Horizon([string]$path) {
+    if ([IO.Path]::GetFileName($path) -ine 'horizon-client.exe' -or
+            -not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw 'Выбери horizon-client.exe из официального распакованного архива Horizon.'
+    }
+    $result = Run-Cli @('config', '--client', $path)
+    if ($result.Code -ne 0) { throw ('Не удалось выбрать движок: ' + $result.Text) }
+    Set-Status ('Локальный движок: ' + $path)
+}
 function Play-Clicked {
     if ($script:busy) { return }
     try {
@@ -262,6 +296,12 @@ function Play-Clicked {
         $profile = Get-Profile
         $engine = [string]$profile['client']
         if ($engine -and (Test-Path -LiteralPath $engine -PathType Leaf)) {
+            Launch-Game
+            return
+        }
+        $localEngine = Find-Local-Horizon
+        if ($localEngine) {
+            Use-Local-Horizon $localEngine
             Launch-Game
             return
         }
