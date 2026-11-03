@@ -1,4 +1,4 @@
-# Run on Windows PowerShell 5.1. Verify structured UTF-8 missing-Minecraft
+﻿# Run on Windows PowerShell 5.1. Verify structured UTF-8 missing-Minecraft
 # diagnostics without fetching Mojang files, using a fake existing engine file.
 param([Parameter(Mandatory = $true)][string]$Source)
 $ErrorActionPreference = 'Stop'
