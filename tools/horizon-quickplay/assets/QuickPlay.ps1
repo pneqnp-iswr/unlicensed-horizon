@@ -255,6 +255,40 @@ function Launch-Game {
         Fail $_.Exception.Message
     }
 }
+function Find-Local-Horizon {
+    $roots = @()
+    if ($env:APPDATA) {
+        $roots += (Join-Path $env:APPDATA 'horizon-launcher\versions')
+        $roots += (Join-Path $env:APPDATA 'unlicensed-horizon-client\engines')
+    }
+    if ($env:LOCALAPPDATA) {
+        $roots += (Join-Path $env:LOCALAPPDATA 'Horizon\current')
+        $roots += (Join-Path $env:LOCALAPPDATA 'Horizon\releases')
+    }
+    foreach ($root in $roots) {
+        if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
+        $direct = Join-Path $root 'horizon-client.exe'
+        if (Test-Path -LiteralPath $direct -PathType Leaf) { return $direct }
+        $children = @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 30)
+        foreach ($child in $children) {
+            foreach ($candidate in @((Join-Path $child.FullName 'horizon-client.exe'),
+                    (Join-Path $child.FullName 'horizon\horizon-client.exe'))) {
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+            }
+        }
+    }
+    return $null
+}
+function Use-Local-Horizon([string]$path) {
+    if ([IO.Path]::GetFileName($path) -ine 'horizon-client.exe' -or
+            -not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw 'Выбери horizon-client.exe из официального распакованного архива Horizon.'
+    }
+    $result = Run-Cli @('config', '--client', $path)
+    if ($result.Code -ne 0) { throw ('Не удалось выбрать движок: ' + $result.Text) }
+    Set-Status ('Локальный движок: ' + $path)
+}
 function Play-Clicked {
     if ($script:busy) { return }
     try {
@@ -262,6 +296,12 @@ function Play-Clicked {
         $profile = Get-Profile
         $engine = [string]$profile['client']
         if ($engine -and (Test-Path -LiteralPath $engine -PathType Leaf)) {
+            Launch-Game
+            return
+        }
+        $localEngine = Find-Local-Horizon
+        if ($localEngine) {
+            Use-Local-Horizon $localEngine
             Launch-Game
             return
         }
@@ -280,7 +320,7 @@ function Play-Clicked {
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Horizon QuickPlay'
-$form.ClientSize = New-Object System.Drawing.Size(602, 707)
+$form.ClientSize = New-Object System.Drawing.Size(602, 777)
 $form.MinimumSize = $form.Size
 $form.MaximumSize = $form.Size
 $form.BackColor = UI-Color 19 27 39
@@ -364,18 +404,32 @@ $checkServer.Add_Click({
         } else { Fail ('Не удалось получить статус сервера:' + [Environment]::NewLine + $result.Text) }
     } catch { Fail $_.Exception.Message }
 })
-$script:playButton = Button '▶   PLAY HORIZON' 32 507 537 55 @(38, 135, 110)
+$manual = Button 'Локальный Horizon… (если GitHub недоступен)' 32 496 537 38 @(68, 85, 108)
+$manual.Add_Click({
+    try {
+        $dialog = New-Object System.Windows.Forms.OpenFileDialog
+        $dialog.Title = 'Выбери horizon-client.exe из распакованного архива Horizon'
+        $dialog.Filter = 'Horizon client (horizon-client.exe)|horizon-client.exe'
+        $dialog.CheckFileExists = $true
+        if ($dialog.ShowDialog() -eq 'OK') {
+            Save-Profile
+            Use-Local-Horizon $dialog.FileName
+            Alert 'Движок выбран. Нажми PLAY HORIZON.'
+        }
+    } catch { Fail $_.Exception.Message }
+})
+$script:playButton = Button '▶   PLAY HORIZON' 32 555 537 55 @(38, 135, 110)
 $script:playButton.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 14)
 $script:playButton.Add_Click({ Play-Clicked })
-$script:status = Label 'PLAY скачает Horizon и проверит игровые файлы.' 32 572 537 42
+$script:status = Label 'PLAY скачает Horizon и проверит игровые файлы.' 32 620 537 42
 $script:status.ForeColor = UI-Color 163 222 199
 $script:progress = New-Object System.Windows.Forms.ProgressBar
-$script:progress.Location = New-Object System.Drawing.Point(32, 625)
+$script:progress.Location = New-Object System.Drawing.Point(32, 687)
 $script:progress.Size = New-Object System.Drawing.Size(424, 18)
 $script:progress.Style = 'Marquee'
 $script:progress.MarqueeAnimationSpeed = 0
 $form.Controls.Add($script:progress)
-$cancel = Button 'Отмена' 469 616 100 37 @(108, 69, 72)
+$cancel = Button 'Отмена' 469 678 100 37 @(108, 69, 72)
 $cancel.Enabled = $false
 $cancel.Add_Click({
     foreach ($task in @('installProcess', 'prepareProcess')) {
@@ -395,7 +449,7 @@ $cancel.Add_Click({
     $script:progress.MarqueeAnimationSpeed = 0
     Set-Status 'Установка отменена. Частично скачанные файлы можно будет проверить при следующем запуске.'
 })
-$footer = Label 'Локальные ники работают только на offline-mode серверах. Для online-mode нужна авторизация.' 32 660 542 40
+$footer = Label 'Локальные ники работают только на offline-mode серверах. Для online-mode нужна авторизация.' 32 730 542 40
 $footer.ForeColor = UI-Color 140 159 180
 
 $script:timer = New-Object System.Windows.Forms.Timer
@@ -411,10 +465,19 @@ $script:timer.Add_Tick({
         if ($code -ne 0) {
             $script:pendingPlay = $false
             $script:playButton.Enabled = $true
-            $details = ''
-            $errFile = Join-Path $script:logDir 'install-stderr.log'
-            if (Test-Path $errFile) { $details = (Get-Content $errFile -Tail 12) -join [Environment]::NewLine }
-            Fail ('Не удалось установить движок Horizon. Проверь интернет. ' + $details)
+            $details = @()
+            foreach ($fileName in @('install-stderr.log', 'install-stdout.log')) {
+                $filePath = Join-Path $script:logDir $fileName
+                if (Test-Path -LiteralPath $filePath -PathType Leaf) {
+                    $details += @(Get-Content -LiteralPath $filePath -Tail 12 -ErrorAction SilentlyContinue)
+                }
+            }
+            $message = ('Не удалось установить Horizon. Код: ' + $code +
+                [Environment]::NewLine + (($details | Select-Object -Last 20) -join [Environment]::NewLine) +
+                [Environment]::NewLine + 'Логи: ' + $script:logDir +
+                [Environment]::NewLine + 'Загрузка вручную: https://github.com/horizon-rust/horizon/releases/tag/nightly' +
+                [Environment]::NewLine + 'Распакуй официальный ZIP и выбери horizon-client.exe через «Локальный Horizon…».')
+            Fail $message
         } else {
             Set-Status 'Движок Horizon установлен.'
             if ($script:pendingPlay) { $script:pendingPlay = $false; Launch-Game }
