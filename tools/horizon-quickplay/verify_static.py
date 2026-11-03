@@ -34,4 +34,10 @@ assert "$script:selectedEnginePath = $installedEngine" in qp, "installer output 
 assert "Save-Profile" in qp[qp.index("function Use-Local-Horizon"):qp.index("function Play-Clicked")], "engine selection not persisted"
 assert "Путь к движку не сохранился" in qp, "manual engine persistence not checked"
 assert "Сначала нужно установить Horizon." not in qp, "misleading old engine error still present"
-print('STATIC VALIDATION PASSED: PowerShell 5.1 BOM; protected variables; preferences; HOME; local engine fallback; accurate install logs; persistent selected engine')
+ap = scripts[1].read_text(encoding='utf-8-sig')
+assert "HORIZON_QUICKPLAY_PREPARE_DIAG" in ap, "missing structured diagnostic channel"
+assert "MINECRAFT_26_3_INPUTS_MISSING" in ap, "missing file-specific error code"
+assert "WriteAllText($target, $json, (New-Object System.Text.UTF8Encoding($false)))" in ap, "diagnostic file not explicitly UTF-8"
+assert "prepare-diagnostic.json" in qp, "GUI does not reference structured diagnostic"
+assert "Get-Content -LiteralPath $diagnosticFile -Raw -Encoding UTF8" in qp, "GUI does not explicitly decode diagnostic as UTF-8"
+print('STATIC VALIDATION PASSED: PowerShell 5.1 and UTF-8 Minecraft input diagnostics')
