@@ -1,6 +1,6 @@
-# Horizon QuickPlay v1.7 — single EXE for Windows
+# Horizon QuickPlay v1.8 — single EXE for Windows
 
-**Double-click `Horizon-QuickPlay-v1.7.exe`.** Type any valid nickname (default `azetech_`), choose Singleplayer or a trusted offline-mode server, and press **PLAY**. The launcher remembers your nickname and downloads the **open-source Horizon engine** from its verified release channel, then checks for prepared game data. If missing, it detects an existing Minecraft Java Edition 26.3 installation in `%APPDATA%\.minecraft` (or a custom folder selected in the GUI), downloads the version-pinned Minecraft server jar from Mojang after validating its SHA-1 and size, and runs the release `horizon-prepare` tool automatically. It also validates prepared data before starting. The GUI remains responsive and displays progress; logs are saved under `%APPDATA%\unlicensed-horizon-client\quickplay-logs`. A separate Microsoft login is not required to set an offline nickname.
+**Double-click `Horizon-QuickPlay-v1.8.exe`.** Type any valid nickname (default `azetech_`), choose Singleplayer or a trusted offline-mode server, and press **PLAY**. The launcher remembers your nickname and downloads the **open-source Horizon engine** from its verified release channel, then checks for prepared game data. If missing, it detects an existing Minecraft Java Edition 26.3 installation in `%APPDATA%\.minecraft` (or a custom folder selected in the GUI), downloads the version-pinned Minecraft server jar from Mojang after validating its SHA-1 and size, and runs the release `horizon-prepare` tool automatically. It also validates prepared data before starting. The GUI remains responsive and displays progress; logs are saved under `%APPDATA%\unlicensed-horizon-client\quickplay-logs`. A separate Microsoft login is not required to set an offline nickname.
 
 **Not a license bypass:** the playable Rust engine needs prepared Minecraft Java Edition 26.3 resources from a copy you are permitted to use. The EXE does not contain or download protected client jars/assets or bypass ownership verification, and it cannot sign in to Minecraft online-mode servers without valid Minecraft credentials. The locally installed Java Edition 26.3 files are a prerequisite for automatic preparation; if they are absent, install and run the game once using its official launcher with an authorized account. Java 25 may also be required for resource preparation. This is not a ready-to-play license-free Minecraft distribution. The experimental original-content lab in the underlying fork is not a playable game.
 
@@ -27,6 +27,14 @@ To cross-compile from Linux, set `GOOS=windows GOARCH=amd64 CGO_ENABLED=0` befor
 ## Implementation boundaries
 
 The UI is a WinForms PowerShell 5.1 script embedded inside a Go Windows GUI executable. Engine installation/verification, profile persistence, resource checking and game spawning are delegated to the separately tested companion launcher. The GUI's direct local game boot is not testable in the Linux build environment. Real Windows/GPU gameplay and a successful multiplayer spawn must be tested on a host with the required assets and server.
+
+## v1.8: identify missing Minecraft 26.3 inputs in readable UTF-8
+
+QuickPlay v1.7 correctly finds a local Horizon game executable, but automatic resource preparation can still fail when the user has **no locally installed Minecraft Java Edition 26.3 data**. Previously Windows PowerShell 5.1 stderr redirection turned Cyrillic diagnostics into unreadable text.
+
+The preparer now explicitly checks for `versions/26.3/26.3.json`, `versions/26.3/26.3.jar`, `assets/indexes`, `assets/objects` and `libraries` in the selected Minecraft folder. If any are absent, it writes UTF-8 structured details to `%APPDATA%\unlicensed-horizon-client\quickplay-logs\prepare-diagnostic.json` (error code `MINECRAFT_26_3_INPUTS_MISSING`, message and exact missing paths). The GUI reads that file with explicit UTF-8 decoding and displays the concrete requirements and the **Обзор…** recovery option, instead of a corrupted PowerShell trace. New Windows PowerShell 5.1 regression tests verify this failure path without downloading Minecraft data.
+
+**This is diagnostics, not a licensing workaround.** An existing `horizon-client.exe` is not sufficient to play Minecraft content. To prepare legally, select an existing authorized Minecraft Java Edition 26.3 installation or install/run the game once from the official launcher on an account entitled to play. QuickPlay does not supply or fetch missing protected client jars/assets without such a source; offline-mode servers do not waive this resource prerequisite.
 
 ## v1.7: fix "engine selected" followed by "install Horizon first"
 
