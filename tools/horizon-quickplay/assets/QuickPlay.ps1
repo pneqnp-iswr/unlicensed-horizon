@@ -18,6 +18,9 @@ $script:busy = $false
 $script:appDir = Join-Path $env:APPDATA 'unlicensed-horizon-client'
 $script:logDir = Join-Path $script:appDir 'quickplay-logs'
 $script:preferencesPath = Join-Path $script:appDir 'quickplay-preferences.json'
+# The selected executable must survive subsequent Save-Profile calls.
+# Never rely only on re-parsing the CLI's show output after the user picks a client.
+$script:selectedEnginePath = ''
 function Get-Preferences {
     $primary = [string]$script:preferencesPath
     $backup = $primary + '.bak'
@@ -65,8 +68,16 @@ function Get-Profile {
         $lines = & $cli show 2>&1
         if ($LASTEXITCODE -ne 0) { return $map }
         foreach ($line in @($lines)) {
-            $part = ([string]$line).Split(@('='), 2)
-            if ($part.Count -eq 2) { $map[$part[0]] = $part[1] }
+            $record = [string]$line
+            # PowerShell 5.1 can select a different .NET String.Split overload
+            # for .Split(@('='), 2). Read key=value using a precise separator.
+            $separator = $record.IndexOf('=')
+            if ($separator -gt 0) {
+                $key = $record.Substring(0, $separator).Trim()
+                if ($key.Length -gt 0) {
+                    $map[$key] = $record.Substring($separator + 1)
+                }
+            }
         }
     } catch { }
     return $map
@@ -146,13 +157,18 @@ function Save-Profile {
     # open-source engine. The preparation stage reports missing data explicitly.
     Save-Preferences
     $previous = Get-Profile
+    # The v1.6 UI previously overwrote a manually selected client_path with
+    # an empty/stale value obtained from CLI show on the NEXT Save-Profile.
+    # Treat the explicit in-session selection as authoritative.
+    $clientPath = [string]$script:selectedEnginePath
+    if (-not $clientPath) { $clientPath = [string]$previous['client'] }
     # PowerShell variable names are case-insensitive; $home would collide with
     # the protected built-in $HOME variable and fail whenever Play is clicked.
     $gameHomeDir = [string]$previous['home']
     if (-not $gameHomeDir) { $gameHomeDir = Join-Path $script:appDir 'game-home' }
     $settings = @{
         nickname = $nick
-        client_path = [string]$previous['client']
+        client_path = $clientPath
         resources_path = [string]$script:resourcesPath
         home_path = $gameHomeDir
         world = ''
@@ -198,9 +214,11 @@ function Find-Resources {
 function Prepare-Game {
     try {
         $profile = Get-Profile
-        $engine = [string]$profile['client']
+        $engine = [string]$script:selectedEnginePath
+        if (-not $engine) { $engine = [string]$profile['client'] }
         if (-not $engine -or -not (Test-Path -LiteralPath $engine -PathType Leaf)) {
-            throw 'Сначала нужно установить Horizon.'
+            throw ('Не найден horizon-client.exe. Сохранённый путь: ' + [string]$profile['client'] +
+                '. Выбери движок через «Локальный Horizon…».')
         }
         New-Item -ItemType Directory -Path $script:logDir -Force | Out-Null
         $script:preparedTarget = Join-Path $script:appDir 'prepared-resources\26.3'
@@ -285,16 +303,32 @@ function Use-Local-Horizon([string]$path) {
             -not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw 'Выбери horizon-client.exe из официального распакованного архива Horizon.'
     }
-    $result = Run-Cli @('config', '--client', $path)
-    if ($result.Code -ne 0) { throw ('Не удалось выбрать движок: ' + $result.Text) }
-    Set-Status ('Локальный движок: ' + $path)
+    $absolutePath = [IO.Path]::GetFullPath($path)
+    $oldPath = [string]$script:selectedEnginePath
+    try {
+        $script:selectedEnginePath = $absolutePath
+        # Persist the chosen path through the same code path used by Play,
+        # rather than relying on a separate CLI config call which Play may undo.
+        Save-Profile
+        $confirmed = Get-Profile
+        if (-not [string]::Equals([string]$confirmed['client'], $absolutePath,
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw ('Путь к движку не сохранился. Выбрано: ' + $absolutePath +
+                '; в профиле: ' + [string]$confirmed['client'])
+        }
+    } catch {
+        $script:selectedEnginePath = $oldPath
+        throw
+    }
+    Set-Status ('Локальный движок сохранён: ' + $absolutePath)
 }
 function Play-Clicked {
     if ($script:busy) { return }
     try {
         Save-Profile
         $profile = Get-Profile
-        $engine = [string]$profile['client']
+        $engine = [string]$script:selectedEnginePath
+        if (-not $engine) { $engine = [string]$profile['client'] }
         if ($engine -and (Test-Path -LiteralPath $engine -PathType Leaf)) {
             Launch-Game
             return
@@ -337,6 +371,7 @@ $tagline.ForeColor = UI-Color 140 168 193
 
 Label 'Никнейм' 32 126 240 | Out-Null
 $profile = Get-Profile
+$script:selectedEnginePath = [string]$profile['client']
 $defaultNick = [string]$profile['name']
 if (-not $defaultNick -or $defaultNick -eq 'Player') { $defaultNick = 'azetech_' }
 $script:nickname = Field $defaultNick 32 155 537
@@ -479,8 +514,19 @@ $script:timer.Add_Tick({
                 [Environment]::NewLine + 'Распакуй официальный ZIP и выбери horizon-client.exe через «Локальный Horizon…».')
             Fail $message
         } else {
-            Set-Status 'Движок Horizon установлен.'
-            if ($script:pendingPlay) { $script:pendingPlay = $false; Launch-Game }
+            $installedProfile = Get-Profile
+            $installedEngine = [string]$installedProfile['client']
+            if (-not $installedEngine -or -not (Test-Path -LiteralPath $installedEngine -PathType Leaf)) {
+                $script:pendingPlay = $false
+                $script:playButton.Enabled = $true
+                Fail 'Установщик завершился без ошибки, но horizon-client.exe не найден в сохранённом профиле. Открой логи установки.'
+            } else {
+                # Installer updated the on-disk path; update the in-memory selection
+                # as well, or the next Save-Profile could undo a successful install.
+                $script:selectedEnginePath = $installedEngine
+                Set-Status ('Движок Horizon установлен: ' + $installedEngine)
+                if ($script:pendingPlay) { $script:pendingPlay = $false; Launch-Game }
+            }
         }
         } else {
             $installLog = Join-Path $script:logDir 'install-stdout.log'

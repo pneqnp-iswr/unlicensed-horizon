@@ -27,4 +27,11 @@ assert "Use-Local-Horizon" in qp, "manual engine fallback absent"
 assert "Get-Content -LiteralPath $filePath -Tail 12" in qp, "download stderr/stdout diagnostic absent"
 assert "Проверь интернет. " not in qp, "misleading generic install error still present"
 assert "Локальный Horizon" in qp, "manual engine picker button absent"
-print('STATIC VALIDATION PASSED: PowerShell 5.1 BOM; protected variables; preferences; HOME; local engine fallback; accurate install logs')
+assert "$separator = $record.IndexOf('=')" in qp, "Windows PowerShell 5.1 profile parser regressed"
+assert "client_path = $clientPath" in qp, "client_path no longer uses selected engine precedence"
+assert "$script:selectedEnginePath = $absolutePath" in qp, "manual selection is not cached"
+assert "$script:selectedEnginePath = $installedEngine" in qp, "installer output is not cached"
+assert "Save-Profile" in qp[qp.index("function Use-Local-Horizon"):qp.index("function Play-Clicked")], "engine selection not persisted"
+assert "Путь к движку не сохранился" in qp, "manual engine persistence not checked"
+assert "Сначала нужно установить Horizon." not in qp, "misleading old engine error still present"
+print('STATIC VALIDATION PASSED: PowerShell 5.1 BOM; protected variables; preferences; HOME; local engine fallback; accurate install logs; persistent selected engine')
